@@ -1,13 +1,10 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import time
 import re
 import requests
 import difflib
 from math import exp
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+import httpx
 
 
 def calcular_probabilidad_empate(score_local, score_visit):
@@ -21,17 +18,18 @@ def calcular_probabilidad_empate(score_local, score_visit):
 
 # --- Parte 1: Obtener estadísticas avanzadas de equipos (FBref con Selenium) ---
 def obtener_estadisticas_avanzadas():
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept-Language": "es-ES,es;q=0.9",
+    }
     url = "https://fbref.com/en/comps/12/La-Liga-Stats"
-    driver.get(url)
-    time.sleep(5)
-    soup = BeautifulSoup(driver.page_source, "html.parser")
-    driver.quit()
+    response = httpx.get(url, headers=headers)
+
+    if response.status_code != 200:
+        print("❌ Error al acceder a FBref:", response.status_code)
+        return []
+
+    soup = BeautifulSoup(response.content, "html.parser")
 
     table = soup.find("table", id="stats_squads_standard_for")
     if not table:
