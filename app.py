@@ -203,6 +203,8 @@ def predicciones():
                 score_local = calcular_score(equipo_local)
                 score_visit = calcular_score(equipo_visitante)
                 prob_local, prob_visit, prob_empate = calcular_probabilidades(score_local, score_visit)
+                ventaja = abs(score_local - score_visit) / max(score_local, score_visit) * 100
+
 
                 prediccion = "Empate"
                 if prob_local > max(prob_visit, prob_empate):
@@ -222,7 +224,7 @@ def predicciones():
                         "awayWin": prob_visit,
                         "draw": prob_empate
                     },
-                    "confidence": max(prob_local, prob_visit, prob_empate)
+                    "confidence": round(ventaja, 1)
                 })
             except Exception as e:
                 print(f"Error procesando partido {home} vs {away}: {e}")
