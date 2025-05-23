@@ -58,51 +58,57 @@ def obtener_estadisticas_avanzadas():
     }
     url = "https://fbref.com/en/comps/12/La-Liga-Stats"
     response = httpx.get(url, headers=headers)
-
     if response.status_code != 200:
         print("❌ Error al acceder a FBref:", response.status_code)
         return []
 
     soup = BeautifulSoup(response.content, "html.parser")
 
-    table = soup.find("table", id="stats_squads_standard_for")
-    if not table:
-        print("❌ No se encontró la tabla de estadísticas.")
-        return []
+    def parse_table(table_id, columns):
+        table = soup.find("table", id=table_id)
+        if not table:
+            print(f"❌ No se encontró la tabla: {table_id}")
+            return {}
+        data = {}
+        for row in table.tbody.find_all("tr"):
+            if row.get("class") == ["thead"]:
+                continue
+            team = row.find("th").text.strip()
+            stats = {}
+            for cell in row.find_all("td"):
+                stat = cell.get("data-stat")
+                if stat in columns:
+                    stats[stat] = cell.text.strip()
+            data[team] = stats
+        return data
 
-    stats = []
-    for row in table.tbody.find_all("tr"):
-        if row.get("class") == ["thead"]:
-            continue
-        team_name = row.find("th").text.strip()
-        cells = row.find_all("td")
-        if len(cells) < 20:
-            continue
-        possession = cells[12].text.strip()
-        touches = cells[13].text.strip()
-        passes_completed = cells[16].text.strip()
-        shots_on_target = cells[9].text.strip()
-        goals = cells[4].text.strip()
-        xg = cells[17].text.strip()
-        xag = cells[18].text.strip()
-        npxg = cells[19].text.strip()
-        yellow_cards = cells[10].text.strip()
-        red_cards = cells[11].text.strip()
+    # Extraemos de múltiples tablas
+    standard = parse_table("stats_squads_standard_for", ["possession", "goals", "xg", "xg_assist", "npxg", "cards_yellow", "cards_red"])
+    passing = parse_table("stats_squads_passing_for", ["passes_completed"])
+    misc = parse_table("stats_squads_possession_for", ["touches"])
+    shooting = parse_table("stats_squads_shooting_for", ["shots_on_target"])
 
-        stats.append({
-            "team": team_name,
-            "possession": possession,
-            "touches": touches,
-            "passes_completed": passes_completed,
-            "shots_on_target": shots_on_target,
-            "goals": goals,
-            "xg": xg,
-            "xag": xag,
-            "npxg": npxg,
-            "yellow_cards": yellow_cards,
-            "red_cards": red_cards
-        })
-    return stats
+
+    # Combinamos los datos por equipo
+    equipos = {}
+    for team in standard:
+        equipos[team] = {
+            "team": team,
+            "possession": standard[team].get("possession", "0"),
+            "goals": standard[team].get("goals", "0"),
+            "xg": standard[team].get("xg", "0"),
+            "xag": standard[team].get("xg_assist", "0"),
+            "npxg": standard[team].get("npxg", "0"),
+            "yellow_cards": standard[team].get("cards_yellow", "0"),
+            "red_cards": standard[team].get("cards_red", "0"),
+            "passes_completed": passing.get(team, {}).get("passes_completed", "0"),
+            "touches": misc.get(team, {}).get("touches", "0"),
+            "shots_on_target": shooting.get(team, {}).get("shots_on_target", "0"),
+        }
+
+    return list(equipos.values())
+
+
 
 def parse_percent(val):
     return float(val.replace('%', '')) if '%' in val else float(val)
@@ -135,16 +141,16 @@ def buscar_equipo(nombre, equipos_dict):
     return None
 
 def calcular_score(team):
-    score = 0
-    # Producción ofensiva (55%)
-    score += parse_number(team['npxg']) * 0.20
-    score += parse_number(team['xag']) * 0.15
-    score += parse_number(team['shots_on_target']) * 0.10
-    score += parse_number(team['goals']) * 0.10
-    # Construcción de juego (35%)
-    score += parse_percent(team['possession']) * 0.10
-    score += parse_number(team['passes_completed']) * 0.10
-    score += parse_number(team['touches']) * 0.05
+    score = 0.0
+    # Producción ofensiva (60%)
+    score += parse_number(team['npxg']) * 0.25    # Finalizaciones no penalti (alta calidad)
+    score += parse_number(team['xag']) * 0.15     # Asistencias esperadas
+    score += parse_number(team['shots_on_target']) * 0.10  # Tiros a puerta reales
+    score += parse_number(team['goals']) * 0.10   # Goles anotados
+    # Construcción de juego (30%)
+    score += parse_percent(team['possession']) * 0.05
+    score += parse_number(team['passes_completed']) / 1000 * 0.10  # normalizamos
+    score += parse_number(team['touches']) / 1000 * 0.05
     # Penalización por disciplina (10%)
     score -= parse_number(team['yellow_cards']) * 0.05
     score -= parse_number(team['red_cards']) * 0.05
