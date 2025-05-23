@@ -15,7 +15,7 @@ last_update = 0
 
 def calcular_probabilidades(score_local, score_visit):
     # Añadimos un factor de localía (10% de ventaja para el equipo local)
-    score_local_ajustado = score_local * 1.7
+    score_local_ajustado = score_local * 1.07
     
     # Calculamos la diferencia relativa
     total = score_local_ajustado + score_visit
