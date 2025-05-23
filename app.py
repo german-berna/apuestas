@@ -17,8 +17,8 @@ last_update = 0
 def normalizar_nombre_equipo(nombre):
     nombre = nombre.lower()
     nombre = unicodedata.normalize('NFKD', nombre)
-    nombre = ''.join(c for c in nombre if not unicodedata.combining(c))
-    nombre = re.sub(r'[^\w\s]', '', nombre)  # elimina símbolos raros
+    nombre = ''.join(c for c in nombre if not unicodedata.combining(c))  # quita tildes
+    nombre = re.sub(r'[^\w\s]', '', nombre)  # elimina símbolos
     nombre = re.sub(r'\s+', ' ', nombre).strip()
 
     # Casos especiales conocidos
@@ -26,7 +26,7 @@ def normalizar_nombre_equipo(nombre):
         return "espanyol"
     if "barcelona" in nombre:
         return "barcelona"
-    if "atlético" in nombre and "madrid" in nombre:
+    if "atletico" in nombre and "madrid" in nombre:
         return "atletico madrid"
     if "real madrid" in nombre:
         return "real madrid"
@@ -42,7 +42,7 @@ def normalizar_nombre_equipo(nombre):
         return "alaves"
 
     # General cleanup
-    nombre = re.sub(r'\b(cf|fc|club|rcd|ud|cd|s\.a\.d\.|real|atlético|de|balompié)\b', '', nombre)
+    nombre = re.sub(r'\b(cf|fc|club|rcd|ud|cd|s\.a\.d\.|real|atletico|de|balompie)\b', '', nombre)
     return nombre.strip()
 
 
@@ -204,10 +204,6 @@ def predicciones():
                 score_visit = calcular_score(equipo_visitante)
                 prob_local, prob_visit, prob_empate = calcular_probabilidades(score_local, score_visit)
 
-                print(home)
-                print(score_local)
-                print(away)
-                print(score_visit)
                 prediccion = "Empate"
                 if prob_local > max(prob_visit, prob_empate):
                     prediccion = home
