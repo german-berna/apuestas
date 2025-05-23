@@ -18,10 +18,33 @@ def normalizar_nombre_equipo(nombre):
     nombre = nombre.lower()
     nombre = unicodedata.normalize('NFKD', nombre)
     nombre = ''.join(c for c in nombre if not unicodedata.combining(c))
-    nombre = re.sub(r'\b(cf|fc|club|s\.a\.d\.|atletico|balompie)\b', '', nombre)
     nombre = re.sub(r'[^\w\s]', '', nombre)  # elimina símbolos raros
     nombre = re.sub(r'\s+', ' ', nombre).strip()
-    return nombre
+
+    # Casos especiales conocidos
+    if "barcelona" in nombre and "espanyol" in nombre:
+        return "espanyol"
+    if "barcelona" in nombre:
+        return "barcelona"
+    if "atlético" in nombre and "madrid" in nombre:
+        return "atletico madrid"
+    if "real madrid" in nombre:
+        return "real madrid"
+    if "real sociedad" in nombre:
+        return "real sociedad"
+    if "rayo vallecano" in nombre:
+        return "rayo vallecano"
+    if "las palmas" in nombre:
+        return "las palmas"
+    if "real betis" in nombre:
+        return "betis"
+    if "deportivo alaves" in nombre or "alaves" in nombre:
+        return "alaves"
+
+    # General cleanup
+    nombre = re.sub(r'\b(cf|fc|club|rcd|ud|cd|s\.a\.d\.|real|atlético|de|balompié)\b', '', nombre)
+    return nombre.strip()
+
 
 def calcular_probabilidades(score_local, score_visit):
     score_local_ajustado = score_local * 1.07
@@ -164,7 +187,7 @@ def predicciones():
     resultados = []
 
     if stats and partidos:
-        equipos_dict = {team['team']: team for team in stats}
+        equipos_dict = {normalizar_nombre_equipo(team['team']): team for team in stats}
         for match in partidos:
             home = match['homeTeam']['name']
             away = match['awayTeam']['name']
@@ -181,6 +204,10 @@ def predicciones():
                 score_visit = calcular_score(equipo_visitante)
                 prob_local, prob_visit, prob_empate = calcular_probabilidades(score_local, score_visit)
 
+                print(home)
+                print(score_local)
+                print(away)
+                print(score_visit)
                 prediccion = "Empate"
                 if prob_local > max(prob_visit, prob_empate):
                     prediccion = home
