@@ -5,18 +5,52 @@ import requests
 import difflib
 from math import exp
 import httpx
+from flask import Flask, jsonify
+from flask_cors import CORS
 
+app = Flask(__name__)
+CORS(app)
+cache = None
+last_update = 0
 
-def calcular_probabilidad_empate(score_local, score_visit):
-    max_valor = max(score_local, score_visit, 1)
-    diff_normalizada = abs(score_local - score_visit) / max_valor  # ahora entre 0 y 1
+def calcular_probabilidades(score_local, score_visit):
+    # Añadimos un factor de localía (10% de ventaja para el equipo local)
+    score_local_ajustado = score_local * 1.7
+    
+    # Calculamos la diferencia relativa
+    total = score_local_ajustado + score_visit
+    diff = abs(score_local_ajustado - score_visit) / total if total > 0 else 0
+    
+    # Base para el cálculo del empate (ajustable)
+    base_empate = 5  # Más alto = menos probabilidad de empate
+    
+    # Probabilidad de empate (inversamente proporcional a la diferencia)
+    prob_empate = 30 * exp(-base_empate * diff)  # Máximo 30% de probabilidad de empate
+    
+    # Distribuimos el resto entre victoria local y visitante
+    resto_prob = 100 - prob_empate
+    
+    if score_local_ajustado > score_visit:
+        prob_victoria_local = resto_prob * (0.5 + diff/2)
+        prob_victoria_visit = resto_prob - prob_victoria_local
+    else:
+        prob_victoria_visit = resto_prob * (0.5 + diff/2)
+        prob_victoria_local = resto_prob - prob_victoria_visit
+    
+    # Aseguramos que no haya valores negativos o mayores a 100
+    prob_victoria_local = max(0, min(100, prob_victoria_local))
+    prob_victoria_visit = max(0, min(100, prob_victoria_visit))
+    prob_empate = max(0, min(100, prob_empate))
+    
+    # Normalizamos para que sumen exactamente 100%
+    total_prob = prob_victoria_local + prob_victoria_visit + prob_empate
+    if total_prob > 0:
+        prob_victoria_local = round(prob_victoria_local * 100 / total_prob, 1)
+        prob_victoria_visit = round(prob_victoria_visit * 100 / total_prob, 1)
+        prob_empate = round(prob_empate * 100 / total_prob, 1)
+    
+    return prob_victoria_local, prob_victoria_visit, prob_empate
 
-    base = 5  # sensibilidad; más alto = menos empates
-    prob = 100 * exp(-base * diff_normalizada)
-    return round(prob, 1)
-
-
-# --- Parte 1: Obtener estadísticas avanzadas de equipos (FBref con Selenium) ---
 def obtener_estadisticas_avanzadas():
     headers = {
         "User-Agent": "Mozilla/5.0",
@@ -79,7 +113,6 @@ def parse_number(val):
     except:
         return 0.0
 
-# --- Parte 2: Obtener próximos partidos ---
 def obtener_partidos():
     API_KEY = '8f766e7e5acb40b78ab66e96222e7755'
     LALIGA_COMPETITION_ID = 2014
@@ -94,7 +127,6 @@ def obtener_partidos():
     data = response.json()
     return data.get('matches', [])
 
-# --- Parte 3: Emparejamiento más robusto usando similitud ---
 def buscar_equipo(nombre, equipos_dict):
     nombre = nombre.lower()
     coincidencias = difflib.get_close_matches(nombre, equipos_dict.keys(), n=1, cutoff=0.5)
@@ -102,7 +134,6 @@ def buscar_equipo(nombre, equipos_dict):
         return equipos_dict[coincidencias[0]]
     return None
 
-# --- Parte 4: Cálculo de score avanzado ---
 def calcular_score(team):
     score = 0
     # Producción ofensiva (55%)
@@ -119,60 +150,6 @@ def calcular_score(team):
     score -= parse_number(team['red_cards']) * 0.05
     return score
 
-# --- Parte 5: Predicción ---
-def predecir_partidos(partidos, estadisticas):
-    print("\n📊 Predicción avanzada de próximos partidos de LaLiga:\n")
-    equipos_dict = {team['team'].lower(): team for team in estadisticas}
-
-    for match in partidos[:10]:
-        home = match['homeTeam']['name']
-        away = match['awayTeam']['name']
-        fecha = match['utcDate']
-
-        equipo_local = buscar_equipo(home, equipos_dict)
-        equipo_visitante = buscar_equipo(away, equipos_dict)
-
-        if not equipo_local or not equipo_visitante:
-            print(f"{fecha}: {home} vs {away} -> ⚠️ Datos incompletos para predicción")
-            continue
-
-        try:
-            score_local = calcular_score(equipo_local)
-            score_visit = calcular_score(equipo_visitante)
-            ventaja = abs(score_local - score_visit) / max(score_local, score_visit) * 100
-
-            print(f"{fecha}: {home} vs {away}")
-            print(f" → Score {home}: {round(score_local, 2)}")
-            print(f" → Score {away}: {round(score_visit, 2)}")
-
-            if score_local > score_visit:
-                print(f" → 🔮 Predicción: gana {home} (ventaja estimada: {ventaja:.1f}%)\n")
-            elif score_visit > score_local:
-                print(f" → 🔮 Predicción: gana {away} (ventaja estimada: {ventaja:.1f}%)\n")
-            else:
-                print(" → 🔮 Predicción: empate\n")
-        except Exception as e:
-            print(f"Error en predicción para {home} vs {away}: {e}\n")
-
-
-# --- Ejecución principal ---
-#if __name__ == "__main__":
-#    stats = obtener_estadisticas_avanzadas()
-#    partidos = obtener_partidos()
-#    if stats and partidos:
-#        predecir_partidos(partidos, stats)
-#    else:
-#        print("No se pudieron obtener todos los datos necesarios.")
-
-
-from flask import Flask, jsonify
-from flask_cors import CORS
-
-app = Flask(__name__)
-CORS(app)  # 🔓 Permite que React acceda a esta API
-cache = None
-last_update = 0
-
 @app.route("/predicciones")
 def predicciones():
     global cache, last_update
@@ -181,14 +158,13 @@ def predicciones():
     if cache and now - last_update < 3600:  # 1 hora de cache
         return jsonify(cache)
 
-    # Si no hay cache o expiró
     stats = obtener_estadisticas_avanzadas()
     partidos = obtener_partidos()
     resultados = []
 
     if stats and partidos:
         equipos_dict = {team['team'].lower(): team for team in stats}
-        for match in partidos[:10]:
+        for match in partidos:
             home = match['homeTeam']['name']
             away = match['awayTeam']['name']
             fecha = match['utcDate']
@@ -202,8 +178,16 @@ def predicciones():
             try:
                 score_local = calcular_score(equipo_local)
                 score_visit = calcular_score(equipo_visitante)
-                ventaja = abs(score_local - score_visit) / max(score_local, score_visit) * 100
-                draw_probability = calcular_probabilidad_empate(score_local, score_visit)
+                
+                # Calculamos las probabilidades mejoradas
+                prob_local, prob_visit, prob_empate = calcular_probabilidades(score_local, score_visit)
+                
+                # Determinamos la predicción más probable
+                prediccion = "Empate"
+                if prob_local > prob_visit and prob_local > prob_empate:
+                    prediccion = home
+                elif prob_visit > prob_local and prob_visit > prob_empate:
+                    prediccion = away
 
                 resultados.append({
                     "date": fecha,
@@ -211,11 +195,16 @@ def predicciones():
                     "away": away,
                     "scoreHome": round(score_local, 2),
                     "scoreAway": round(score_visit, 2),
-                    "prediction": home if score_local > score_visit else away,
-                    "confidence": round(ventaja, 1),
-                    "drawProbability": draw_probability
+                    "prediction": prediccion,
+                    "probabilities": {
+                        "homeWin": prob_local,
+                        "awayWin": prob_visit,
+                        "draw": prob_empate
+                    },
+                    "confidence": max(prob_local, prob_visit, prob_empate)
                 })
-            except:
+            except Exception as e:
+                print(f"Error procesando partido {home} vs {away}: {str(e)}")
                 continue
 
     cache = resultados
@@ -224,4 +213,3 @@ def predicciones():
 
 if __name__ == "__main__":
     app.run(debug=True)
-
