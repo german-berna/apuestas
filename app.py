@@ -104,6 +104,7 @@ def obtener_estadisticas_avanzadas():
     passing = parse_table("stats_squads_passing_for", ["passes_completed"])
     misc = parse_table("stats_squads_possession_for", ["touches"])
     shooting = parse_table("stats_squads_shooting_for", ["shots_on_target"])
+    keepers = parse_table("stats_squads_keeper_adv_for", ["gk_psxg_net"])
 
     equipos = {}
     for team in standard:
@@ -119,6 +120,7 @@ def obtener_estadisticas_avanzadas():
             "passes_completed": passing.get(team, {}).get("passes_completed", "0"),
             "touches": misc.get(team, {}).get("touches", "0"),
             "shots_on_target": shooting.get(team, {}).get("shots_on_target", "0"),
+            "gk_psxg_net": keepers.get(team, {}).get("gk_psxg_net", "0"),
         }
 
     return list(equipos.values())
@@ -170,6 +172,7 @@ def calcular_score(team):
     score += parse_percent(team['possession']) * 0.20
     score += parse_number(team['passes_completed']) / 1000 * 0.10
     score += parse_number(team['touches']) / 1000 * 0.05
+    score += parse_number(team.get('gk_psxg_net', '0')) * 0.30
     score -= parse_number(team['yellow_cards']) * 0.05
     score -= parse_number(team['red_cards']) * 0.05
     return score
