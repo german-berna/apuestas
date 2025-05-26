@@ -104,7 +104,8 @@ def obtener_estadisticas_avanzadas():
     passing = parse_table("stats_squads_passing_for", ["passes_completed"])
     misc = parse_table("stats_squads_possession_for", ["touches"])
     shooting = parse_table("stats_squads_shooting_for", ["shots_on_target"])
-    keepers = parse_table("stats_squads_keeper_adv_for", ["gk_psxg_net"])
+    keepers_adv = parse_table("stats_squads_keeper_adv_for", ["gk_psxg_net"])
+    keepers = parse_table("stats_squads_keeper_for", ["gk_goals_against", "gk_clean_sheets_pct"])
 
     equipos = {}
     for team in standard:
@@ -120,7 +121,9 @@ def obtener_estadisticas_avanzadas():
             "passes_completed": passing.get(team, {}).get("passes_completed", "0"),
             "touches": misc.get(team, {}).get("touches", "0"),
             "shots_on_target": shooting.get(team, {}).get("shots_on_target", "0"),
-            "gk_psxg_net": keepers.get(team, {}).get("gk_psxg_net", "0"),
+            "gk_psxg_net": keepers_adv.get(team, {}).get("gk_psxg_net", "0"),
+            "gk_goals_against": keepers.get(team, {}).get("gk_goals_against", "0"),
+            "gk_clean_sheets_pct": keepers.get(team, {}).get("gk_clean_sheets_pct", "0"),
         }
 
     return list(equipos.values())
@@ -173,6 +176,11 @@ def calcular_score(team):
     score += parse_number(team['passes_completed']) / 1000 * 0.10
     score += parse_number(team['touches']) / 1000 * 0.05
     score += parse_number(team.get('gk_psxg_net', '0')) * 0.30
+
+    # Penalización por goles encajados y bajo porcentaje de porterías a cero
+    score -= parse_number(team.get('gk_goals_against_per90', '0')) * 0.18
+    score -= (100 - parse_percent(team.get('gk_clean_sheets_pct', '0'))) * 0.05 / 100
+    
     score -= parse_number(team['yellow_cards']) * 0.05
     score -= parse_number(team['red_cards']) * 0.05
     return score
@@ -207,7 +215,6 @@ def predicciones():
                 score_visit = calcular_score(equipo_visitante)
                 prob_local, prob_visit, prob_empate = calcular_probabilidades(score_local, score_visit)
                 ventaja = abs(score_local - score_visit) / max(score_local, score_visit) * 100
-
 
                 prediccion = "Empate"
                 if prob_local > max(prob_visit, prob_empate):
