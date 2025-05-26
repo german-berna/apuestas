@@ -104,7 +104,7 @@ def obtener_estadisticas_avanzadas():
     passing = parse_table("stats_squads_passing_for", ["passes_completed"])
     misc = parse_table("stats_squads_possession_for", ["touches"])
     shooting = parse_table("stats_squads_shooting_for", ["shots_on_target"])
-    keepers_adv = parse_table("stats_squads_keeper_adv_for", ["gk_psxg_net"])
+    keepers_adv = parse_table("stats_squads_keeper_adv_for", ["gk_psxg"])
     keepers = parse_table("stats_squads_keeper_for", ["gk_goals_against", "gk_clean_sheets_pct"])
 
     equipos = {}
@@ -121,7 +121,7 @@ def obtener_estadisticas_avanzadas():
             "passes_completed": passing.get(team, {}).get("passes_completed", "0"),
             "touches": misc.get(team, {}).get("touches", "0"),
             "shots_on_target": shooting.get(team, {}).get("shots_on_target", "0"),
-            "gk_psxg_net": keepers_adv.get(team, {}).get("gk_psxg_net", "0"),
+            "gk_psxg": keepers_adv.get(team, {}).get("gk_psxg", "0"),
             "gk_goals_against": keepers.get(team, {}).get("gk_goals_against", "0"),
             "gk_clean_sheets_pct": keepers.get(team, {}).get("gk_clean_sheets_pct", "0"),
         }
@@ -175,11 +175,9 @@ def calcular_score(team):
     score += parse_percent(team['possession']) * 0.20
     score += parse_number(team['passes_completed']) / 1000 * 0.10
     score += parse_number(team['touches']) / 1000 * 0.05
-    score += parse_number(team.get('gk_psxg_net', '0')) * 0.20
-
-    # Penalización por goles encajados y bajo porcentaje de porterías a cero
+    score -= parse_number(team.get('gk_psxg', '0')) * 0.20 
     score -= parse_number(team.get('gk_goals_against', '0')) * 0.30
-    score += (100 - parse_percent(team.get('gk_clean_sheets_pct', '0'))) * 0.20
+    score += parse_percent(team.get('gk_clean_sheets_pct', '0')) * 0.20
     score -= parse_number(team['yellow_cards']) * 0.05
     score -= parse_number(team['red_cards']) * 0.05
     return score
