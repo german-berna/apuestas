@@ -71,15 +71,14 @@ def calcular_probabilidades(score_local, score_visit):
 
 def obtener_estadisticas_avanzadas():
     headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Accept-Language": "es-ES,es;q=0.9",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Referer": "https://www.google.com/"
     }
-    url = "https://fbref.com/en/comps/12/La-Liga-Stats"
-    response = httpx.get(url, headers=headers)
-    if response.status_code != 200:
-        print("❌ Error al acceder a FBref:", response.status_code)
-        return []
 
+    proxy_url = f"http://api.scraperapi.com?api_key=ad218ecf00d9b705804e71cf6588ab8a&url=https://fbref.com/en/comps/12/La-Liga-Stats"
+
+    response = requests.get(proxy_url, headers=headers)
     soup = BeautifulSoup(response.content, "html.parser")
 
     def parse_table(table_id, columns):
