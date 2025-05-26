@@ -179,6 +179,7 @@ def calcular_score(team):
     score += parse_percent(team.get('gk_clean_sheets_pct', '0')) * 0.20
     score -= parse_number(team['yellow_cards']) * 0.05
     score -= parse_number(team['red_cards']) * 0.05
+    score += 100
     return score
 
 @app.route("/predicciones")
