@@ -175,12 +175,11 @@ def calcular_score(team):
     score += parse_percent(team['possession']) * 0.20
     score += parse_number(team['passes_completed']) / 1000 * 0.10
     score += parse_number(team['touches']) / 1000 * 0.05
-    score += parse_number(team.get('gk_psxg_net', '0')) * 0.30
+    score += parse_number(team.get('gk_psxg_net', '0')) * 0.20
 
     # Penalización por goles encajados y bajo porcentaje de porterías a cero
-    score -= parse_number(team.get('gk_goals_against_per90', '0')) * 0.18
-    score -= (100 - parse_percent(team.get('gk_clean_sheets_pct', '0'))) * 0.05 / 100
-    
+    score -= parse_number(team.get('gk_goals_against', '0')) * 0.30
+    score += (100 - parse_percent(team.get('gk_clean_sheets_pct', '0'))) * 0.20
     score -= parse_number(team['yellow_cards']) * 0.05
     score -= parse_number(team['red_cards']) * 0.05
     return score
